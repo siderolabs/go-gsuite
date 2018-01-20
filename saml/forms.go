@@ -83,7 +83,5 @@ func (g *GSuite) postAWSSaml() (accounts []Account, err error) {
 		return
 	}
 
-	accounts = scrapeAWSInfo(doc)
-
-	return accounts, nil
+	return scrapeAWSInfo(doc)
 }

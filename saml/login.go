@@ -24,11 +24,13 @@ type GSuite struct {
 	samlResponse      string
 }
 
+// Account represents an AWS account.
 type Account struct {
 	Name  string
 	Roles []Role
 }
 
+// Role represents and AWS role.
 type Role struct {
 	Name string
 	ARN  *arn.ARN

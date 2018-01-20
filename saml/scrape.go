@@ -61,7 +61,7 @@ func scrapeAWSInfo(doc *goquery.Document) (accounts []Account, err error) {
 			}
 			role := Role{
 				Name: s.Text(),
-				ARN:  parsed,
+				ARN:  &parsed,
 			}
 			account.Roles = append(account.Roles, role)
 		})
