@@ -30,7 +30,7 @@ type Account struct {
 
 type Role struct {
 	Name string
-	ARN  string
+	ARN  *arn.ARN
 }
 
 // NewGSuiteSAMLLogin instantiates and returns an *GSuite configured with a

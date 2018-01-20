@@ -4,6 +4,7 @@ import (
 	"net/url"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/aws/aws-sdk-go/aws/arn"
 )
 
 func scrapeFormValues(doc *goquery.Document) (v url.Values) {
@@ -47,21 +48,25 @@ func scrapeSAMLResponse(doc *goquery.Document) (SAMLResponse string) {
 	return SAMLResponse
 }
 
-func scrapeAWSInfo(doc *goquery.Document) (accounts []Account) {
+func scrapeAWSInfo(doc *goquery.Document) (accounts []Account, err error) {
 	accounts = []Account{}
 	doc.Find("fieldset > div.saml-account").Each(func(i int, s *goquery.Selection) {
 		name := s.Find("div.saml-account-name").Text()
 		account := Account{Name: name}
 		s.Find("label").Each(func(i int, s *goquery.Selection) {
-			arn, _ := s.Attr("for")
+			a, _ := s.Attr("for")
+			parsed, err := arn.Parse(a)
+			if err != nil {
+				return
+			}
 			role := Role{
 				Name: s.Text(),
-				ARN:  arn,
+				ARN:  parsed,
 			}
 			account.Roles = append(account.Roles, role)
 		})
 		accounts = append(accounts, account)
 	})
 
-	return accounts
+	return accounts, nil
 }
