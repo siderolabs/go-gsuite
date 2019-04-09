@@ -1,6 +1,7 @@
 package saml
 
 import (
+	"errors"
 	"net/url"
 
 	"github.com/PuerkitoBio/goquery"
@@ -21,31 +22,58 @@ func scrapeFormValues(doc *goquery.Document) (v url.Values) {
 	return v
 }
 
-func scrapeFormAction(doc *goquery.Document) (formAction string) {
+func scrapeFormAction(doc *goquery.Document) (formAction string, err error) {
 	formAction, found := doc.Find("#gaia_loginform").Attr("action")
 	if !found {
-		return
+		return "", errors.New("failed to find form action: #gaia_loginform")
 	}
 
-	return formAction
+	return formAction, nil
 }
 
-func scrapeFormActionF(doc *goquery.Document) (formAction string) {
-	formAction, found := doc.Find("#f").Attr("action")
+func scrapeFormActionF(doc *goquery.Document) (formAction string, err error) {
+	formAction, found := doc.Find("form").Attr("action")
 	if !found {
-		return
+		return "", errors.New("failed to find form action: #f")
 	}
 
-	return formAction
+	return formAction, nil
 }
 
-func scrapeSAMLResponse(doc *goquery.Document) (SAMLResponse string) {
-	SAMLResponse, found := doc.Find("[name='SAMLResponse']").Attr("value")
+func scrapeContinue(doc *goquery.Document) (tl string, err error) {
+	tl, found := doc.Find("input[name=continue]").Attr("value")
 	if !found {
-		return
+		return "", errors.New("failed to find continue")
 	}
 
-	return SAMLResponse
+	return tl, nil
+}
+
+func scrapeTL(doc *goquery.Document) (tl string, err error) {
+	tl, found := doc.Find("input[name=TL]").Attr("value")
+	if !found {
+		return "", errors.New("failed to find MFA TL")
+	}
+
+	return tl, nil
+}
+
+func scrapeGXF(doc *goquery.Document) (gxf string, err error) {
+	gxf, found := doc.Find("input[name=gxf]").Attr("value")
+	if !found {
+		return "", errors.New("failed to find MFA gxf")
+	}
+
+	return gxf, nil
+}
+
+func scrapeSAMLResponse(doc *goquery.Document) (SAMLResponse string, err error) {
+	SAMLResponse, found := doc.Find("input[name='SAMLResponse']").Attr("value")
+	if !found {
+		return "", errors.New("failed to find SAMLResponse")
+	}
+
+	return SAMLResponse, nil
 }
 
 func scrapeAWSInfo(doc *goquery.Document) (accounts []Account, err error) {
