@@ -1,9 +1,11 @@
 package saml
 
 import (
+	"bufio"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -21,6 +23,8 @@ func (g *GSuite) getLoginForm() (err error) {
 		return
 	}
 
+	defer r.Body.Close()
+
 	if r.StatusCode != http.StatusOK {
 		return errors.Errorf("failed to get login form, status code %d", r.StatusCode)
 	}
@@ -34,10 +38,6 @@ func (g *GSuite) getLoginForm() (err error) {
 		return
 	}
 
-	if g.cont, err = scrapeContinue(doc); err != nil {
-		return
-	}
-
 	g.currentFormValues = scrapeFormValues(doc)
 
 	return err
@@ -45,12 +45,15 @@ func (g *GSuite) getLoginForm() (err error) {
 
 // enterEmail sets the email in the form.
 func (g *GSuite) enterEmail(email string) (err error) {
-	g.currentFormValues["Email"] = []string{email}
+	g.email = email
+	g.currentFormValues["Email"] = []string{g.email}
 
 	r, err := g.PostForm(g.currentFormAction, g.currentFormValues)
 	if err != nil {
 		return
 	}
+
+	defer r.Body.Close()
 
 	if r.StatusCode != http.StatusOK {
 		return errors.Errorf("email failed, status code %d", r.StatusCode)
@@ -65,24 +68,24 @@ func (g *GSuite) enterEmail(email string) (err error) {
 		return
 	}
 
-	if g.cont, err = scrapeContinue(doc); err != nil {
-		return
-	}
-
 	g.currentFormValues = scrapeFormValues(doc)
 
 	return err
 }
 
 // enterPassword sets the password in the form.
-func (g *GSuite) enterPassword(e, p string) (err error) {
-	g.currentFormValues["Email"] = []string{e}
-	g.currentFormValues["Passwd"] = []string{p}
+func (g *GSuite) enterPassword(passwd string) (err error) {
+	g.passwd = passwd
+
+	g.currentFormValues["Email"] = []string{g.email}
+	g.currentFormValues["Passwd"] = []string{g.passwd}
 
 	r, err := g.PostForm(g.currentFormAction, g.currentFormValues)
 	if err != nil {
 		return
 	}
+
+	defer r.Body.Close()
 
 	if r.StatusCode != http.StatusOK {
 		return errors.Errorf("password failed, status code %d", r.StatusCode)
@@ -97,19 +100,79 @@ func (g *GSuite) enterPassword(e, p string) (err error) {
 		return
 	}
 
-	if g.cont, err = scrapeContinue(doc); err != nil {
+	g.currentFormValues = scrapeFormValues(doc)
+
+	url, token, required := captchaRequired(doc)
+	if required {
+		g.enterCAPTCHA(url, token)
+	} else {
+		// TODO(andrewrynhard): How can we scrape these automatically?
+		tl, _ := doc.Find("input[name=TL]").Attr("value")
+		g.currentFormValues["TL"] = []string{tl}
+
+		cont, _ := doc.Find("input[name=continue]").Attr("value")
+		g.currentFormValues["continue"] = []string{cont}
+
+		scc, _ := doc.Find("input[name=scc]").Attr("value")
+		g.currentFormValues["scc"] = []string{scc}
+
+		sarp, _ := doc.Find("input[name=sarp]").Attr("value")
+		g.currentFormValues["sarp"] = []string{sarp}
+
+		gxf, _ := doc.Find("input[name=gxf]").Attr("value")
+		g.currentFormValues["gxf"] = []string{gxf}
+	}
+
+	return err
+}
+
+// enterCAPTCHA sets the captcha in the form.
+func (g *GSuite) enterCAPTCHA(url, token string) (err error) {
+	println("CAPTCHA URL: " + url)
+
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter CAPTCHA: ")
+	captcha, _ := reader.ReadString('\n')
+	captcha = strings.Trim(captcha, "\n")
+
+	g.currentFormValues["Email"] = []string{g.email}
+	g.currentFormValues["Passwd"] = []string{g.passwd}
+	g.currentFormValues["logincaptcha"] = []string{captcha}
+	g.currentFormValues["logintoken"] = []string{token}
+	g.currentFormValues["url"] = []string{url}
+
+	r, err := g.PostForm(g.currentFormAction, g.currentFormValues)
+	if err != nil {
 		return
 	}
 
-	if g.tl, err = scrapeTL(doc); err != nil {
+	defer r.Body.Close()
+	doc, err := goquery.NewDocumentFromResponse(r)
+	if err != nil {
 		return
 	}
 
-	if g.gxf, err = scrapeGXF(doc); err != nil {
+	if g.currentFormAction, err = scrapeFormActionF(doc); err != nil {
 		return
 	}
 
 	g.currentFormValues = scrapeFormValues(doc)
+
+	// TODO(andrewrynhard): How can we scrape these automatically?
+	tl, _ := doc.Find("input[name=TL]").Attr("value")
+	g.currentFormValues["TL"] = []string{tl}
+
+	cont, _ := doc.Find("input[name=continue]").Attr("value")
+	g.currentFormValues["continue"] = []string{cont}
+
+	scc, _ := doc.Find("input[name=scc]").Attr("value")
+	g.currentFormValues["scc"] = []string{scc}
+
+	sarp, _ := doc.Find("input[name=sarp]").Attr("value")
+	g.currentFormValues["sarp"] = []string{sarp}
+
+	gxf, _ := doc.Find("input[name=gxf]").Attr("value")
+	g.currentFormValues["gxf"] = []string{gxf}
 
 	return err
 }
@@ -118,22 +181,23 @@ func (g *GSuite) enterPassword(e, p string) (err error) {
 func (g *GSuite) enterMFA(m string) (err error) {
 	parts := strings.Split(g.currentFormAction, "totp/")
 
-	g.currentFormValues["continue"] = []string{g.cont}
-	g.currentFormValues["scc"] = []string{"1"}
-	g.currentFormValues["sarp"] = []string{"1"}
+	if len(parts) != 2 {
+		return errors.Errorf("could not find challengeId from URL %q", g.currentFormAction)
+	}
 	g.currentFormValues["TrustDevice"] = []string{"on"}
 	g.currentFormValues["challengeId"] = []string{parts[1]}
 	g.currentFormValues["challengeType"] = []string{"6"}
+	g.currentFormValues["Email"] = []string{g.email}
+	g.currentFormValues["Passwd"] = []string{g.passwd}
 	g.currentFormValues["Pin"] = []string{m}
-	g.currentFormValues["TL"] = []string{g.tl}
-	g.currentFormValues["gxf"] = []string{g.gxf}
-	g.currentFormValues["pstMsg"] = []string{"0"}
 	g.currentFormValues["checkedDomains"] = []string{"youtube"}
 
 	r, err := g.PostForm("https://accounts.google.com"+g.currentFormAction, g.currentFormValues)
 	if err != nil {
 		return
 	}
+
+	defer r.Body.Close()
 
 	if r.StatusCode != http.StatusOK {
 		return errors.Errorf("MFA pin failed, status code %d", r.StatusCode)
