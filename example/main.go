@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/autonomy/go-gsuite/saml"
+	"github.com/talos-systems/go-gsuite/saml"
 )
 
 func prompt(accounts []saml.Account) (arn string) {
