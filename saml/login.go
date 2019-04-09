@@ -1,11 +1,15 @@
 package saml
 
 import (
+	"bufio"
+	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"os/user"
 	"path"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -22,6 +26,9 @@ type GSuite struct {
 	currentFormAction string
 	currentFormValues url.Values
 	samlResponse      string
+	tl                string
+	gxf               string
+	cont              string
 }
 
 // Account represents an AWS account.
@@ -58,6 +65,9 @@ func NewGSuiteSAMLLogin(idpid, spid string) (g *GSuite, err error) {
 		"",
 		url.Values{},
 		"",
+		"",
+		"",
+		"",
 	}
 
 	return g, err
@@ -74,6 +84,14 @@ func (g *GSuite) Login(e, p string) (accounts []Account, err error) {
 		return
 	}
 	err = g.enterPassword(e, p)
+	if err != nil {
+		return
+	}
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter PIN: ")
+	pin, _ := reader.ReadString('\n')
+	pin = strings.Trim(pin, "\n")
+	err = g.enterMFA(pin)
 	if err != nil {
 		return
 	}
