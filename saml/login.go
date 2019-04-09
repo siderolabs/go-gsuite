@@ -26,9 +26,8 @@ type GSuite struct {
 	currentFormAction string
 	currentFormValues url.Values
 	samlResponse      string
-	tl                string
-	gxf               string
-	cont              string
+	email             string
+	passwd            string
 }
 
 // Account represents an AWS account.
@@ -67,7 +66,6 @@ func NewGSuiteSAMLLogin(idpid, spid string) (g *GSuite, err error) {
 		"",
 		"",
 		"",
-		"",
 	}
 
 	return g, err
@@ -83,7 +81,7 @@ func (g *GSuite) Login(e, p string) (accounts []Account, err error) {
 	if err != nil {
 		return
 	}
-	err = g.enterPassword(e, p)
+	err = g.enterPassword(p)
 	if err != nil {
 		return
 	}

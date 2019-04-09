@@ -8,6 +8,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws/arn"
 )
 
+func captchaRequired(doc *goquery.Document) (string, string, bool) {
+	url, found := doc.Find(".captcha-container > input[name=url]").Attr("value")
+	token, _ := doc.Find(".captcha-container > input[name=logintoken]").Attr("value")
+	return url, token, found
+}
+
 func scrapeFormValues(doc *goquery.Document) (v url.Values) {
 	v = url.Values{}
 	doc.Find("#gaia_loginform > input").Each(func(i int, s *goquery.Selection) {
@@ -38,33 +44,6 @@ func scrapeFormActionF(doc *goquery.Document) (formAction string, err error) {
 	}
 
 	return formAction, nil
-}
-
-func scrapeContinue(doc *goquery.Document) (tl string, err error) {
-	tl, found := doc.Find("input[name=continue]").Attr("value")
-	if !found {
-		return "", errors.New("failed to find continue")
-	}
-
-	return tl, nil
-}
-
-func scrapeTL(doc *goquery.Document) (tl string, err error) {
-	tl, found := doc.Find("input[name=TL]").Attr("value")
-	if !found {
-		return "", errors.New("failed to find MFA TL")
-	}
-
-	return tl, nil
-}
-
-func scrapeGXF(doc *goquery.Document) (gxf string, err error) {
-	gxf, found := doc.Find("input[name=gxf]").Attr("value")
-	if !found {
-		return "", errors.New("failed to find MFA gxf")
-	}
-
-	return gxf, nil
 }
 
 func scrapeSAMLResponse(doc *goquery.Document) (SAMLResponse string, err error) {
