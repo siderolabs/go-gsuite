@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/user"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/arn"
@@ -115,37 +115,49 @@ func (g *GSuite) RetrieveAWSCredentials(principal, arn string) (o *sts.AssumeRol
 }
 
 // SaveAWSCredentials saves the STS credentials to ~/.aws/credentials.
-func (g *GSuite) SaveAWSCredentials(o *sts.AssumeRoleWithSAMLOutput, p string) {
+func (g *GSuite) SaveAWSCredentials(o *sts.AssumeRoleWithSAMLOutput, p string) error {
 	usr, err := user.Current()
 	if err != nil {
-		return
+		return err
 	}
 	dir := usr.HomeDir
-	sharedCredentialsFile := path.Join(dir, ".aws", "credentials")
+	sharedCredentialsFile := filepath.Join(dir, ".aws", "credentials")
+	if err := os.MkdirAll(filepath.Dir(sharedCredentialsFile), 0700); err != nil {
+		return err
+	}
+	if _, err := os.Stat(sharedCredentialsFile); os.IsNotExist(err) {
+		emptyFile, err := os.Create(sharedCredentialsFile)
+		defer emptyFile.Close()
+		if err != nil {
+			return err
+		}
+	}
 	config, err := ini.Load(sharedCredentialsFile)
 	if err != nil {
-		return
+		return err
 	}
 
 	iniProfile, err := config.NewSection(p)
 	if err != nil {
-		return
+		return err
 	}
 	_, err = iniProfile.NewKey("aws_access_key_id", *o.Credentials.AccessKeyId)
 	if err != nil {
-		return
+		return err
 	}
 	_, err = iniProfile.NewKey("aws_secret_access_key", *o.Credentials.SecretAccessKey)
 	if err != nil {
-		return
+		return err
 	}
 	_, err = iniProfile.NewKey("aws_session_token", *o.Credentials.SessionToken)
 	if err != nil {
-		return
+		return err
 	}
 
 	err = config.SaveTo(sharedCredentialsFile)
 	if err != nil {
-		return
+		return err
 	}
+
+	return nil
 }
