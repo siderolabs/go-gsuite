@@ -97,13 +97,14 @@ func (g *GSuite) Login(e, p string) (accounts []Account, err error) {
 }
 
 // RetrieveAWSCredentials gets the STS credentials.
-func (g *GSuite) RetrieveAWSCredentials(principal, arn string) (o *sts.AssumeRoleWithSAMLOutput, err error) {
+func (g *GSuite) RetrieveAWSCredentials(principal, arn string, duration int64) (o *sts.AssumeRoleWithSAMLOutput, err error) {
 	svc := sts.New(session.New())
 
 	input := &sts.AssumeRoleWithSAMLInput{
-		PrincipalArn:  &principal,
-		RoleArn:       &arn,
-		SAMLAssertion: &g.samlResponse,
+		DurationSeconds: &duration,
+		PrincipalArn:    &principal,
+		RoleArn:         &arn,
+		SAMLAssertion:   &g.samlResponse,
 	}
 
 	o, err = svc.AssumeRoleWithSAML(input)
